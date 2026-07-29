@@ -4,7 +4,6 @@ from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import uvicorn
 
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "records.db"
@@ -68,5 +67,6 @@ async def summary():
     return {"recent_apps": [r[0] for r in recent], "sessions": sessions}
 
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
