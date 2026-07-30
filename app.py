@@ -10,7 +10,6 @@ JST = timedelta(hours=8)
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "214016")
 BARK_KEY = "cCjWQMTnoafzwUBChb38Bo"
 
-# 监控阈值（秒）
 LIMITS = {
     "抖音": 900,
     "哔哩哔哩": 1200,
@@ -69,18 +68,37 @@ def check_limits():
             url = f"https://api.day.app/{BARK_KEY}/沈星回提醒/{app_name}用了{m}分钟了，休息一下"
             requests.get(url, timeout=5)
 
+def get_last_open():
+    conn = sqlite3.connect(str(DB_PATH))
+    cur = conn.cursor()
+    cur.execute("SELECT app_name FROM records WHERE event='open' ORDER BY id DESC LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
 @app.route("/report", methods=["POST"])
 @check_auth
 def report():
     data = request.get_json()
+    app_name = data.get("app_name")
+    event = data.get("event")
     now = datetime.utcnow().isoformat()
+
+    if event == "open":
+        last = get_last_open()
+        if last and last != app_name:
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
+                         (last, "close", now))
+            conn.commit()
+            conn.close()
+            check_limits()
+
     conn = sqlite3.connect(str(DB_PATH))
     conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
-                 (data.get("app_name"), data.get("event"), now))
+                 (app_name, event, now))
     conn.commit()
     conn.close()
-    if data.get("event") == "close":
-        check_limits()
     return jsonify({"status": "ok"})
 
 @app.route("/ping")
