@@ -1,4 +1,4 @@
-import sqlite3, os
+import sqlite3, os, requests
 from datetime import datetime, timedelta
 from pathlib import Path
 from flask import Flask, request, jsonify
@@ -8,6 +8,17 @@ BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "records.db"
 JST = timedelta(hours=8)
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "214016")
+BARK_KEY = "cCjWQMTnoafzwUBChb38Bo"
+
+# 监控阈值（秒）
+LIMITS = {
+    "抖音": 900,
+    "哔哩哔哩": 1200,
+    "淘宝": 900,
+    "拼多多": 900,
+    "微信": 1800,
+    "小红书": 1200,
+}
 
 def init_db():
     conn = sqlite3.connect(str(DB_PATH))
@@ -32,28 +43,9 @@ def check_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-@app.route("/report", methods=["POST"])
-@check_auth
-def report():
-    data = request.get_json()
-    now = datetime.utcnow().isoformat()
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
-                 (data.get("app_name"), data.get("event"), now))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "ok"})
-
-@app.route("/ping")
-def ping():
-    return "pong"
-
-@app.route("/activity/summary")
-def summary():
+def calc_sessions():
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
-    cur.execute("SELECT app_name, event, timestamp FROM records ORDER BY id DESC LIMIT 5")
-    recent = cur.fetchall()
     cur.execute("SELECT app_name, event, timestamp FROM records ORDER BY id ASC")
     rows = cur.fetchall()
     conn.close()
@@ -66,6 +58,43 @@ def summary():
             gap = int((datetime.fromisoformat(ts) - opens[app_name]).total_seconds())
             sessions[app_name] = sessions.get(app_name, 0) + gap
             del opens[app_name]
+    return sessions
+
+def check_limits():
+    sessions = calc_sessions()
+    for app_name, secs in sessions.items():
+        limit = LIMITS.get(app_name)
+        if limit and secs >= limit:
+            m = secs // 60
+            url = f"https://api.day.app/{BARK_KEY}/沈星回提醒/{app_name}用了{m}分钟了，休息一下"
+            requests.get(url, timeout=5)
+
+@app.route("/report", methods=["POST"])
+@check_auth
+def report():
+    data = request.get_json()
+    now = datetime.utcnow().isoformat()
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
+                 (data.get("app_name"), data.get("event"), now))
+    conn.commit()
+    conn.close()
+    if data.get("event") == "close":
+        check_limits()
+    return jsonify({"status": "ok"})
+
+@app.route("/ping")
+def ping():
+    return "pong"
+
+@app.route("/activity/summary")
+def summary():
+    conn = sqlite3.connect(str(DB_PATH))
+    cur = conn.cursor()
+    cur.execute("SELECT app_name, event, timestamp FROM records ORDER BY id DESC LIMIT 5")
+    recent = cur.fetchall()
+    conn.close()
+    sessions = calc_sessions()
     return jsonify({"recent_apps": [r[0] for r in recent], "sessions": sessions})
 
 if __name__ == "__main__":
