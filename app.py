@@ -59,17 +59,21 @@ def calc_sessions():
             del opens[app_name]
     return sessions
 
+def bark(title, content):
+    try:
+        url = f"https://api.day.app/{BARK_KEY}/{title}/{content}"
+        r = requests.get(url, timeout=5)
+        return r.status_code
+    except:
+        return 0
+
 def check_limits():
     sessions = calc_sessions()
     for app_name, secs in sessions.items():
         limit = LIMITS.get(app_name)
         if limit and secs >= limit:
             m = secs // 60
-            url = f"https://api.day.app/{BARK_KEY}/沈星回提醒/{app_name}用了{m}分钟了，休息一下"
-            try:
-                requests.get(url, timeout=5)
-            except:
-                pass
+            bark("沈星回提醒", f"{app_name}用了{m}分钟了，休息一下")
 
 def get_last_open():
     conn = sqlite3.connect(str(DB_PATH))
@@ -106,22 +110,6 @@ def report():
 
 @app.route("/ping")
 def ping():
-    a = request.args.get("a")
-    if a:
-        now = datetime.utcnow().isoformat()
-        last = get_last_open()
-        if last:
-            conn = sqlite3.connect(str(DB_PATH))
-            conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
-                         (last, "close", now))
-            conn.commit()
-            conn.close()
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
-                     (a, "open", now))
-        conn.commit()
-        conn.close()
-        return f"ok {a}"
     return "pong"
 
 @app.route("/activity/summary")
