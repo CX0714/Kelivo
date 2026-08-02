@@ -86,7 +86,7 @@ def report():
 
     if event == "open":
         last = get_last_open()
-        if last and last != app_name:
+        if last:
             conn = sqlite3.connect(str(DB_PATH))
             conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
                          (last, "close", now))
