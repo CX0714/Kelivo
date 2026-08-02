@@ -106,11 +106,23 @@ def report():
 
 @app.route("/ping")
 def ping():
+    a = request.args.get("a")
+    if a:
+        now = datetime.utcnow().isoformat()
+        last = get_last_open()
+        if last:
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
+                         (last, "close", now))
+            conn.commit()
+            conn.close()
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
+                     (a, "open", now))
+        conn.commit()
+        conn.close()
+        return f"ok {a}"
     return "pong"
-
-@app.route("/test_report")
-def test_report():
-    return jsonify({"status": "ok"})
 
 @app.route("/activity/summary")
 def summary():
