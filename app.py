@@ -66,7 +66,10 @@ def check_limits():
         if limit and secs >= limit:
             m = secs // 60
             url = f"https://api.day.app/{BARK_KEY}/沈星回提醒/{app_name}用了{m}分钟了，休息一下"
-            requests.get(url, timeout=5)
+            try:
+                requests.get(url, timeout=5)
+            except:
+                pass
 
 def get_last_open():
     conn = sqlite3.connect(str(DB_PATH))
@@ -107,22 +110,7 @@ def ping():
 
 @app.route("/test_report")
 def test_report():
-    app_name = request.args.get("app_name", "unknown")
-    now = datetime.utcnow().isoformat()
-    last = get_last_open()
-    if last:
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
-                     (last, "close", now))
-        conn.commit()
-        conn.close()
-        check_limits()
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("INSERT INTO records (app_name, event, timestamp) VALUES (?, ?, ?)",
-                 (app_name, "open", now))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "ok", "app_name": app_name})
+    return jsonify({"status": "ok"})
 
 @app.route("/activity/summary")
 def summary():
