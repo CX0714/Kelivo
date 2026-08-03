@@ -26,6 +26,12 @@ def init_db():
         app_name TEXT NOT NULL,
         event TEXT NOT NULL,
         timestamp TEXT NOT NULL)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS device (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        battery TEXT,
+        location TEXT,
+        volume TEXT,
+        timestamp TEXT NOT NULL)""")
     conn.commit()
     conn.close()
 
@@ -62,10 +68,9 @@ def calc_sessions():
 def bark(title, content):
     try:
         url = f"https://api.day.app/{BARK_KEY}/{title}/{content}"
-        r = requests.get(url, timeout=5)
-        return r.status_code
+        requests.get(url, timeout=5)
     except:
-        return 0
+        pass
 
 def check_limits():
     sessions = calc_sessions()
@@ -82,6 +87,16 @@ def get_last_open():
     row = cur.fetchone()
     conn.close()
     return row[0] if row else None
+
+def get_device():
+    conn = sqlite3.connect(str(DB_PATH))
+    cur = conn.cursor()
+    cur.execute("SELECT battery, location, volume, timestamp FROM device ORDER BY id DESC LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        return {"battery": row[0], "location": row[1], "volume": row[2], "updated": row[3]}
+    return {}
 
 @app.route("/report", methods=["POST"])
 @check_auth
@@ -106,6 +121,17 @@ def report():
                  (app_name, event, now))
     conn.commit()
     conn.close()
+
+    battery = data.get("battery")
+    location = data.get("location")
+    volume = data.get("volume")
+    if battery or location or volume:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.execute("INSERT INTO device (battery, location, volume, timestamp) VALUES (?, ?, ?, ?)",
+                     (battery, location, volume, now))
+        conn.commit()
+        conn.close()
+
     return jsonify({"status": "ok"})
 
 @app.route("/ping")
@@ -120,7 +146,8 @@ def summary():
     recent = cur.fetchall()
     conn.close()
     sessions = calc_sessions()
-    return jsonify({"recent_apps": [r[0] for r in recent], "sessions": sessions})
+    device = get_device()
+    return jsonify({"recent_apps": [r[0] for r in recent], "sessions": sessions, "device": device})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
