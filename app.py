@@ -122,15 +122,14 @@ def report():
     conn.commit()
     conn.close()
 
-    battery = data.get("battery")
-    location = data.get("location")
-    volume = data.get("volume")
-    if battery or location or volume:
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.execute("INSERT INTO device (battery, location, volume, timestamp) VALUES (?, ?, ?, ?)",
-                     (battery, location, volume, now))
-        conn.commit()
-        conn.close()
+    battery = str(data.get("battery", ""))
+    location = str(data.get("location", ""))
+    volume = str(data.get("volume", ""))
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("INSERT INTO device (battery, location, volume, timestamp) VALUES (?, ?, ?, ?)",
+                 (battery, location, volume, now))
+    conn.commit()
+    conn.close()
 
     return jsonify({"status": "ok"})
 
