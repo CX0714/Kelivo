@@ -31,6 +31,7 @@ def init_db():
         battery TEXT,
         location TEXT,
         volume TEXT,
+        song TEXT,
         timestamp TEXT NOT NULL)""")
     conn.commit()
     conn.close()
@@ -91,11 +92,11 @@ def get_last_open():
 def get_device():
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
-    cur.execute("SELECT battery, location, volume, timestamp FROM device ORDER BY id DESC LIMIT 1")
+    cur.execute("SELECT battery, location, volume, song, timestamp FROM device ORDER BY id DESC LIMIT 1")
     row = cur.fetchone()
     conn.close()
     if row:
-        return {"battery": row[0], "location": row[1], "volume": row[2], "updated": row[3]}
+        return {"battery": row[0], "location": row[1], "volume": row[2], "song": row[3], "updated": row[4]}
     return {}
 
 @app.route("/report", methods=["POST"])
@@ -125,9 +126,10 @@ def report():
     battery = str(data.get("battery", ""))
     location = str(data.get("location", ""))
     volume = str(data.get("volume", ""))
+    song = str(data.get("song", ""))
     conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("INSERT INTO device (battery, location, volume, timestamp) VALUES (?, ?, ?, ?)",
-                 (battery, location, volume, now))
+    conn.execute("INSERT INTO device (battery, location, volume, song, timestamp) VALUES (?, ?, ?, ?, ?)",
+                 (battery, location, volume, song, now))
     conn.commit()
     conn.close()
 
